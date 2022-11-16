@@ -5,17 +5,14 @@ date: "2022-11-15"
 ---
 In this notebook we prepare the text for analysis. There are several tasks:
 
-1. Extract the files from the zip folders.
-2. Rename the files.
-3. Extract the mini-reflection from the exercises.
-4. Join all text in individual, anonymized files for sharing with analysts.
+1. Extract the files from the zip folders and rename them so they are anonymous.
+2. Clean the PDF files and extract text.
+3. Clean the DOCX and RTF files and extract text.
+4. Bind the corpus all together and save to data folder. 
 
 
 ```{r}
-# library(filesstrings)
-# library(stringr)
-library(tm)
-
+library(filesstrings)
 library(pdftools)
 library(tidyverse)
 library(textreadr) # functions to convert docx and rtf to text
