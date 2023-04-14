@@ -22,6 +22,8 @@ library(textreadr) # functions to convert docx and rtf to text
 
 Unzip data files, some are pdfs, docx. and rtf. They are also different formats; some have title text, some have names+student numbers, some have the question for the assignment. Our goal is to extract the reflection text ONLY from the files - to keep it anonymous and to only include reflection text as part of the analysis:
 ```{r}
+# so here, make sure the raw-data folder only contains "Data-for-Reflection-Analysis.zip" and nothing else. Otherwise this code will have reproducibility issues.
+
 #unzip
 unzip("raw-data/Data-for-Reflection-Analysis.zip")
 #delete folder with files from ENVSOCTY3LT3. Those will not be analysed in this project
@@ -59,7 +61,10 @@ file_paths_rtf <- file_paths[grepl(".rtf", file_paths)]
 ids_pdf <- paste0(folder, 1:length(file_paths_pdf), "-PDF.pdf")
 ids_docx <- paste0(folder, 1:length(file_paths_docx), "-DOCX.docx")
 ids_rtf <- paste0(folder, 1:length(file_paths_rtf), "-RTF.rtf")
+```
 
+
+```{r}
 # now we copy all the files but give them new names and remove the duplicated files (that have the old names)
 file.copy(from = file_paths_pdf, to = ids_pdf)
 file.remove(file_paths_pdf)
@@ -75,7 +80,9 @@ Let's first start with the PDF files:
 ```{r}
 #make the data frame
 corpus_raw <- data.frame("title" = c(),"text" = c())
+```
 
+```{r}
 #cycle for the text fetching: 
 for (i in 1:length(ids_pdf)){
     # #print i so that I know the loop is working right
