@@ -2,6 +2,14 @@
 title: "01-data-processing"
 format: html
 ---
+Title: Using open educational and reproducible resources to teach spatial statistics: reflections on a student-instructor experience
+
+## Abstract
+Applied Spatial Statics, a fourth year course offered in the department of Earth, Environment and Society. It is the go-to course for those looking to expand their statistical expertise using Geographical Informational Systems software. Over the years, the course material and software required for the course has been transformed to become completely open and reproducible: the use of computational R notebooks and an open education resource in the form of a web-based textbook (https://paezha.github.io/spatial-analysis-r/). The course has also been taught in a flipped-classroom style with strategic incorporation of reflections using the "Reflective Learning Framework" (Whalen, 2020). In addition to these materials reducing the financial burden on the students, the reproducible and open components of the course has contributed to a smoother instruction transition.
+
+This presentation will take the audience under the hood of the R notebooks used to teach the course, the flipped-classroom teaching style, aspects of the material that allowed for continuity in teaching the course, and a sentiment analysis of past students' reflections. The presentation will be given by Anastasia, a student of the course (Winter 2020) who had the pleasure of teaching the course as a sessional instructor (Winter 2023), so lessons on the importance of reproducible course material format for instruction continuity and lessons learned will be shared. 
+
+
 ```{r, include=FALSE, message=FALSE, warning=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
@@ -16,7 +24,9 @@ library(quanteda) #using kwic()
 library(kableExtra) #using column_spec()
 library(ldatuning) #using FindTopicsNumber
 library(topicmodels) #using LDA
-install.packages("topicmodels")
+library(here)
+library(dplyr)
+library(tidyr)
 ```
 
 ```{r}
@@ -72,11 +82,14 @@ d <- data.frame(word = names(v),freq=v)
 
 ### Word cloud
 ```{r word-cloud, fig.height=8, fig.width=8, echo=FALSE, fig.cap="\\label{fig:word-cloud}A word cloud depicting common words identified in the learners' reflections."}
-#Create the word cloud
-wordcloud(words = d$word, freq = d$freq,
-          max.words=200, random.order=FALSE,
-          rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"))
+#Creates the word cloud
+# png(file=paste0(here::here(),"/images/word_cloud_plot.png"))
+# wordcloud(words = d$word, freq = d$freq,
+#           max.words=200, random.order=FALSE,
+#           rot.per=0.35, 
+#           colors=brewer.pal(8, "Dark2"))
+# dev.off()
+knitr::include_graphics(paste0(here::here(),"/images/word_cloud_plot.png"))
 ```
 ## Relationships between words
 
@@ -101,7 +114,7 @@ reflections_bigram_counts <- reflections_bigrams_separated %>%
   count(word1, word2, sort = TRUE)
 
 # Adjust the parameter below to filter out bigrams based on desired number of occurrence
-# Error will occur if n is outide the range of occurrences 
+# Error will occur if n is outside the range of occurrences 
 reflections_bigram_graph <- reflections_bigram_counts %>%
   filter(n > 7) %>%
   graph_from_data_frame()
@@ -113,7 +126,7 @@ a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
 ReflectionsTextDF <- data.frame(text = sapply(reflections_corpus, as.character), stringsAsFactors = FALSE)
 R_it_train = itoken(ReflectionsTextDF$text, progressbar = FALSE)
 reflections_vocab = create_vocabulary(R_it_train)
-reflections_vocab <- prune_vocabulary(reflections_vocab, term_count_min = 5)
+reflections_vocab <- prune_vocabulary(reflections_vocab)
 ```
 
 ```{r, echo=FALSE, fig.align = 'center', out.width = "1\\linewidth", fig.cap = "\\label{fig:reflections-visual}Most common bigrams found in student reflections from ENVSOCTY 4GA3"}
@@ -158,14 +171,13 @@ kwic_pol_23 <- kwic(tokens(reflections_quanteda), pattern = "proper", window = 2
 ```
 
 ```{r, echo=FALSE}
-# NOTE: this needs to be updates
+# NOTE: this needs to be updated
 text_tbl <- data.frame(
-  Terms = c("helped", "confidence", "enjoyed", "easy", "valuable", "excited"),
+  Terms = c("helped", "confidence", "enjoyed", "valuable", "excited"),
   Context = c(
     "... This was linked with hypothesis testing, which **helped** me understand set boundaries in the setting of point pattern analysis",
     "... I was used to seeing them in ArcGIS, which is a more user-friendly output. However, I stuck with it and now I can confidently read Moran Tests in R... Mostly, this course has been a lesson in **confidence** for me.",
     "I’ve **enjoyed** doing these reflections as I feel it has allowed me to take deeper meaning from the weekly activities of the class.",
-    "Assignments were done on a weekly basis... This was a fantastic idea because other classes that I have taken cover a lot of material in between testing, and it is **easy** for students to lose grasp of those concepts or forget them entirely",
     "R is generally seen as one of the more basic coding languages... [its] utility in data preparation is very **valuable**. The pre-processing stage of the project was the most engaging. ",
     "Within the midterm reflection I talked about how I was **excited** to continue to engage with spatial stats and here we are. I’ve engaged with more of it and yet I am still very much **excited**.")
 )
@@ -279,7 +291,7 @@ kbl(text_tbl,
   kable_paper(full_width = F) %>%
   kable_styling(latex_options = c("striped")) %>%
   column_spec(1, bold = T) %>%
-  column_spec(3, width = "20em")
+  column_spec(3, width = "10em")
 ```
 
 ### Topics in Reflection
@@ -304,28 +316,47 @@ reflections_lda_num <- FindTopicsNumber(
 
 ```{r, include=FALSE}
 FindTopicsNumber_plot(reflections_lda_num)
-# The graphs suggest that there are 14-17 topics in the corpus, but this could be difficult to interpret
+# The graphs suggest that there are ~10 topics in the corpus, but this could be difficult to interpret
 # Topics could be explored starting with k = 7
 ```
 
 ```{r, cache = TRUE, include=FALSE}
-reflections_lda <- LDA(reflections_dtm, k = 7, method = "Gibbs", control = NULL, model = NULL)
+reflections_lda <- LDA(reflections_dtm, k = 5, method = "Gibbs", control = NULL, model = NULL)
 ```
 
 ```{r municipal-topics, include=FALSE}
 reflections_topics <- tidy(reflections_lda, matrix = "beta")
 ```
 
-```{r reflections-terms, echo=FALSE, out.width="1\\linewidth", cache=TRUE, fig.cap="\\label{fig:academic-terms}Topics identified in the learners' reflections according to clusters of words."}
+```{r reflections-terms-creating"}
 reflections_top_terms <- reflections_topics %>%
   group_by(topic) %>%
   slice_max(beta, n = 10) %>% 
   ungroup() %>%
   arrange(topic, -beta)
-reflections_top_terms %>%
-  mutate(term = reorder_within(term, beta, topic)) %>%
-  ggplot(aes(beta, term, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  scale_y_reordered()
 ```
+
+
+```{r reflections-terms, echo=FALSE, out.width="1\\linewidth", cache=TRUE, fig.cap="\\label{fig:academic-terms}Topics identified in the learners' reflections according to clusters of words."}
+# png(file=paste0(here::here(),"/images/topic_clusters_plot.png"))
+# reflections_top_terms %>%
+#   mutate(term = reorder_within(term, beta, topic),
+#          topic = case_when(topic == 1 ~ 'Threshold concepts',
+#                            topic == 2 ~ 'Science communication',
+#                            topic == 3 ~ 'New tools',
+#                            topic == 4 ~ 'Webbook',
+#                            topic == 5 ~ 'Flipped classroom')) %>%
+#   ggplot(aes(beta, term, fill = factor(topic))) +
+#   geom_col(show.legend = FALSE) +
+#   facet_wrap(~ topic, scales = "free") +
+#   scale_y_reordered()
+# dev.off()
+
+knitr::include_graphics(paste0(here::here(),"/images/topic_clusters_plot.png"))
+```
+
+1) -- "Threshold concepts" 
+2) -- "science communication" 
+3) -- "new tools for the future"
+4) -- "webbook"
+5) -- "flipped classroom"
