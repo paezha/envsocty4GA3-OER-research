@@ -12,12 +12,13 @@ In this notebook we prepare the text for analysis. There are several tasks:
 
 
 ```{r}
-library(filesstrings)
-library(pdftools)
-library(tidyverse)
+library(filesstrings) # Handy File and String Manipulation
+library(pdftools) # Text Extraction, Rendering and Converting of PDF Documents
+library(tidyverse) # Easily Install and Load the 'Tidyverse'
 ## THIS PACKAGE HAS BEEN DISCONTINUED; IT CAN BE INSTALLED WITH renv::install("textreadr@1.2.0") or obtained from here: https://cran.r-project.org/src/contrib/Archive/textreadr/
 library(textreadr) # functions to convert docx and rtf to text
 ```
+
 
 # -- Task 1: unzip raw data files and organize the raw-data folder
 
@@ -27,13 +28,23 @@ Unzip data files, some are pdfs, docx. and rtf. They are also different formats;
 
 #unzip
 unzip("raw-data/Data-for-Reflection-Analysis.zip")
-#delete folder with files from ENVSOCTY3LT3. Those will not be analysed in this project
-unlink("Named-Reflections-ENVSOCTY3LT3", recursive=TRUE)
+#unlink("Named-Reflections-ENVSOCTY4GA3", recursive=TRUE)
 
-#move files from Named-Reflections-ENVSOCTY4GA3 into the raw-data/ENVSOCTY4GA3 folder
-file_paths <- list.files(path = "Named-Reflections-ENVSOCTY4GA3", full.names = TRUE) # here we create a string of each files directory
-move_files(files=file_paths, destinations = "raw-data") #move all files into 'raw-data'
-unlink("Named-Reflections-ENVSOCTY4GA3", recursive=TRUE) #remove the, now empty, Named-Reflection-ENVSOCTY4GA3 folder
+#move files from Named-Reflections-ENVSOCTY4GA3 into the raw-data/ folder
+# 2020
+file_paths_2020 <- list.files(path = "Data-for-Reflection-Analysis/2020-Data-for-Reflection-Analysis/Named-Reflections-ENVSOCTY4GA3", full.names = TRUE) # here we create a string of each files directory
+move_files(files=file_paths_2020, destinations = "raw-data/reflections") #move all files into 'raw-data'
+# 2021
+file_paths_2021 <- list.files(path = "Data-for-Reflection-Analysis/2021-Data-for-Reflection-Analysis/Named-Reflections-ENVSOCTY4GA3", full.names = TRUE) # here we create a string of each files directory
+move_files(files=file_paths_2021, destinations = "raw-data/reflections") #move all files into 'raw-data'
+# 2022
+file_paths_2022 <- list.files(path = "Data-for-Reflection-Analysis/2022-Data-for-Reflection-Analysis/Named-Reflections-ENVSOCTY4GA3", full.names = TRUE) # here we create a string of each files directory
+move_files(files=file_paths_2022, destinations = "raw-data/reflections") #move all files into 'raw-data'
+# 2024
+file_paths_2024 <- list.files(path = "Data-for-Reflection-Analysis/2024-Data-for-Reflection-Analysis/Named-Reflections-ENVSOCTY4GA3", full.names = TRUE) # here we create a string of each files directory
+move_files(files=file_paths_2024, destinations = "raw-data/reflections") #move all files into 'raw-data'
+
+unlink("Data-for-Reflection-Analysis", recursive=TRUE) #remove the, now empty, Named-Reflection-ENVSOCTY4GA3 folder
 
 #Great! Now all the files from ENVSOCTY4GA3 are in the raw-data folder, along with the original 'Data-for-Reflection-Analysis.zip'
 ```
@@ -43,109 +54,94 @@ unlink("Named-Reflections-ENVSOCTY4GA3", recursive=TRUE) #remove the, now empty,
 Before starting, let's delete the duplicate submission (manually identified) and then rename the files so they have short and anonyomous names
 ```{r}
 #folder location of the reflections
-folder <- paste0(getwd(), "/raw-data/")
+folder <- paste0(getwd(), "/raw-data/reflections")
 
-#deleting the duplicate submission and index file
-file.remove(paste0(folder, "200844 -  Ling Cen - Apr 22, 2022 1036 PM - 4GA3 Final Reflection - Ling Cen 400181569.docx"))
-file.remove(paste0(folder, "index.html"))
-
-#create a list of the current file path names
 file_paths <- list.files(path = folder, full.names = TRUE)
-file_paths <- file_paths[1:length(file_paths)-1] #removing the .zip at the end of the file list. That zip contains the raw data.
+file_names <- list.files(path = folder, full.names = FALSE)
+#file_exts <- sapply(strsplit(file_names, split = "\\."), `[`, 2) 
 
-#select only PDFs for now, by applying a filter
-file_paths_pdf <- file_paths[grepl(".pdf", file_paths)]
+#files by year
+file_names_2020 <- file_names[grepl("137554", file_paths)] 
+file_exts_2020 <- sapply(strsplit(file_names_2020, split = "\\."), `[`, 2) 
+
+file_names_2021 <- file_names[grepl(" 2021 ", file_paths)] 
+file_exts_2021 <- sapply(strsplit(file_names_2021, split = "\\."), `[`, 2) 
+
+file_names_2022 <- file_names[grepl(" 2022 ", file_paths)] 
+file_exts_2022 <- sapply(strsplit(file_names_2022, split = "\\."), `[`, 2) 
+
+file_names_2024 <- file_names[grepl(" 2024 ", file_paths)] 
+file_exts_2024 <- sapply(strsplit(file_names_2024, split = "\\."), `[`, 2) 
+
+ids_2020 <- paste0(folder, "/2020-", 1:length(file_names_2020), ".", file_exts_2020)
+ids_2021 <- paste0(folder, "/2021-", 1:length(file_names_2021), ".", file_exts_2021)
+ids_2022 <- paste0(folder, "/2022-", 1:length(file_names_2022), ".", file_exts_2022)
+ids_2024 <- paste0(folder, "/2024-", 1:length(file_names_2024), ".", file_exts_2024)
+
+#rename files to date them
+file.rename(from = paste0(folder, "/", file_names_2020),
+            to = ids_2020)
+file.rename(from = paste0(folder, "/", file_names_2021),
+            to = ids_2021)
+file.rename(from = paste0(folder, "/", file_names_2022),
+            to = ids_2022)
+file.rename(from = paste0(folder, "/", file_names_2024),
+            to = ids_2024)
+
+
+#new file paths
+file_paths <- list.files(path = folder, full.names = TRUE)
+#new file names
+file_names <- list.files(path = folder, full.names = FALSE)
+
+#files by format
 file_paths_docx <- file_paths[grepl(".docx", file_paths)]
+file_names_docx <- file_names[grepl(".docx", file_names)]
 file_paths_rtf <- file_paths[grepl(".rtf", file_paths)]
+file_names_rtf <- file_names[grepl(".rtf", file_names)]
 
 #creating a vector of new file names
-ids_pdf <- paste0(folder, 1:length(file_paths_pdf), "-PDF.pdf")
-ids_docx <- paste0(folder, 1:length(file_paths_docx), "-DOCX.docx")
-ids_rtf <- paste0(folder, 1:length(file_paths_rtf), "-RTF.rtf")
+ids_docx <- paste0(folder, "/DOCX-", file_names_docx)
+ids_rtf <- paste0(folder, "/RTF-", file_names_rtf)
 ```
 
-
+Rename all files so that they can be identified by format and year:
 ```{r}
 # now we copy all the files but give them new names and remove the duplicated files (that have the old names)
-file.copy(from = file_paths_pdf, to = ids_pdf)
-file.remove(file_paths_pdf)
-file.copy(from = file_paths_docx, to = ids_docx)
-file.remove(file_paths_docx)
-file.copy(from = file_paths_rtf, to = ids_rtf)
-file.remove(file_paths_rtf)
+file.rename(from = file_paths_docx, to = ids_docx)
+file.rename(from = file_paths_rtf, to = ids_rtf)
 ```
 
 We're ready to extract text! 
-
-Let's first start with the PDF files:
-```{r}
-#make the data frame
-corpus_raw <- data.frame("title" = c(),"text" = c())
-```
-
-```{r}
-#cycle for the text fetching: 
-for (i in 1:length(ids_pdf)){
-    # #print i so that I know the loop is working right
-    # print(i)
-    #extract the text and clean out 'header' text with gsub
-    text_from_pdf <- gsub(pattern = ".*2022\n", replacement ="",
-                          gsub(pattern = ".*Final Reflection\n", replacement ="" ,
-                               gsub(pattern = ".*400201299\n", replacement ="" ,
-                                    gsub(pattern = ".*400201299\n", replacement ="" ,
-                                         gsub(pattern = ".*400117187\n", replacement ="" , 
-                                              gsub(pattern = "Bourgeois/\\d{1}", replacement ="" , 
-                                                   gsub(pattern = ".*Words: 1421\n", replacement ="" , 
-                                                      gsub(pattern = ".*Would you say this experience will impact how you do
-things in the future, and if so how?", replacement ="" ,   
-                          paste0(pdf_text(ids_pdf[i]), collapse = "\n"))))))))) %>%
-            str_trim() %>% # Remove padding blank spaces
-            str_replace_all("[\r\n]", " ") %>% # Replace line break symbols with spaces
-            str_squish() # Remove unnecessary blank spaces in text
-    temp_store_data <- data.frame("title" = gsub(pattern = "", replacement = "", 
-                                               x = ids_pdf[i], ignore.case = T), 
-                                  "text" = text_from_pdf, stringsAsFactors = F)
-    # save text to columns
-    colnames(temp_store_data) <- c("title", "text")
-    corpus_raw <- rbind(corpus_raw, temp_store_data)
-}
-
-corpus_raw_pdf <- corpus_raw
-corpus_raw_pdf[2] #viewing the 'text' of the pdf. This is a check to see if the manual-ish gsub text removals worked correctly
-```
 
 # -- Task 3: Clean files in raw-data folder such that all files are in DOCX and RTF file type and only 'reflection' text remains.
 
 Let's do DOCX now! We will have to use 'read_docx' function from the textreadr package. It uses the 'antiword' engine to extract text from word documents.
 ```{r}
 #make the data frame
-corpus_raw <- data.frame("title" = c(),"text" = c())
+corpus_raw <- data.frame(title = NULL,
+                         text = NULL)
 
 #cycle for the text fetching: 
 for (i in 1:length(ids_docx)){
     # #print i so that I know the loop is working right
     # print(i)
-    #extract the text and clean out 'header' text with gsub
-    text_from_docx <- gsub(pattern = ".*2022\n", replacement ="",
-                          gsub(pattern = ".*Final Reflection\n", replacement ="" ,
-                               gsub(pattern = ".*400128881", replacement ="" ,
-                                    gsub(pattern = ".*400113094", replacement ="" ,
-                                         gsub(pattern = ".*Soukhov", replacement ="" , 
-                                              gsub(pattern = ".*400233137", replacement ="" , 
-                                                   gsub(pattern = ".*400187238", replacement ="" ,
-                                                        gsub(pattern = ".*400181569", replacement ="" ,  
-                                                      gsub(pattern = ".*, and if so how?", replacement ="" ,   
-                          paste0(read_docx(ids_docx[i]), collapse = "\n")))))))))) %>%
-            str_trim() %>% # Remove padding blank spaces
-            str_replace_all("[\r\n]", " ") %>% # Replace line break symbols with spaces
-            str_squish() # Remove unnecessary blank spaces in text
-    temp_store_data <- data.frame("title" = gsub(pattern = "", replacement = "", 
-                                               x = ids_docx[i], ignore.case = T), 
-                                  "text" = text_from_docx, stringsAsFactors = F)
-    # save text to columns
-    colnames(temp_store_data) <- c("title", "text")
-    corpus_raw <- rbind(corpus_raw, temp_store_data)
+  corpus_raw <- rbind(corpus_raw,
+                      data.frame(title = gsub(pattern = "",
+                                              replacement = "",
+                                              x = file_names_docx[i], ignore.case = T),
+                                 text = paste0(read_docx(ids_docx[i]), collapse = "\n")))
 }
+
+corpus_raw <- corpus_raw |>
+  mutate(text = str_trim(text), # Remove padding blank spaces
+         # Replace line break symbols with spaces
+         text = str_replace_all(text,
+                                "[\r\n]",
+                                " "),
+         # Remove unnecessary blank spaces in text
+         text = str_squish(text))
+
 
 corpus_raw_docx <- corpus_raw
 corpus_raw_docx[2] #viewing the 'text' of the docx This is a check to see if the manual-ish gsub text removals worked correctly
@@ -153,23 +149,46 @@ corpus_raw_docx[2] #viewing the 'text' of the docx This is a check to see if the
 
 Let's do RTF now! We only have 1 RTF file... so no need for a for loop for this one. I'll use 'read_rtf' function from the textreadr package. 
 ```{r}
-text_from_rtf <-  gsub(pattern = ".*22nd May\n", replacement ="",
-                       paste0(read_rtf(ids_rtf[1]), collapse = "\n")) %>%
-            str_trim() %>% # Remove padding blank spaces
-            str_replace_all("[\r\n]", " ") %>% # Replace line break symbols with spaces
-            str_squish() # Remove unnecessary blank spaces in text
+#make the data frame
+corpus_raw <- data.frame(title = NULL,
+                         text = NULL)
 
-corpus_raw_rtf <- data.frame("title" = gsub(pattern = "", replacement = "",
-                                           x = ids_rtf[1], ignore.case = T), 
-                                  "text" = text_from_rtf, stringsAsFactors = F)
+#cycle for the text fetching: 
+for (i in 1:length(ids_rtf)){
+    # #print i so that I know the loop is working right
+    # print(i)
+  corpus_raw <- rbind(corpus_raw,
+                      data.frame(title = gsub(pattern = "",
+                                              replacement = "",
+                                              x = file_names_rtf[i], ignore.case = T),
+                                 text = paste0(read_rtf(ids_rtf[i]), collapse = "\n")))
+}
 
-corpus_raw_rtf[2] #viewing the 'text' of the rtf. This is a check to see if the manual-ish gsub text removals worked correctly
+corpus_raw <- corpus_raw |>
+  mutate(text = str_trim(text), # Remove padding blank spaces
+         # Replace line break symbols with spaces
+         text = str_replace_all(text,
+                                "[\r\n]",
+                                " "),
+         # Remove unnecessary blank spaces in text
+         text = str_squish(text))
+
+corpus_raw_rtf <- corpus_raw
+corpus_raw_rtf[2] #viewing the 'text' of the docx This is a check to see if the manual-ish gsub text removals worked correctly
 ```
 
-# -- Task 4: Merge all text reflection data frames into one anonymous frame and save it into 'data'.
+# -- Task 4: Clean the repository.
+
+Delete the folder with all the reflections:
+```{r}
+unlink("raw-data/reflections", recursive=TRUE) #remove the, now empty, Named-Reflection-ENVSOCTY4GA3 folder
+```
+
+# -- Task 5: Merge all text reflection data frames into one anonymous frame and save it into 'data'.
+
 Merge all data frames
 ```{r}
-corpus_raw <- rbind(corpus_raw_pdf, corpus_raw_docx, corpus_raw_rtf)
+corpus_raw <- rbind(corpus_raw_docx, corpus_raw_rtf)
 ```
 
 Save data:
@@ -178,6 +197,7 @@ dir.create(paste0(here::here(), "/data"))
 
 save(corpus_raw, 
      file = paste0(here::here(), "/data/corpus_raw.rda"),
-     compress = "bzip2",
-     version = 2)
+     compress = "xz")
 ```
+
+
