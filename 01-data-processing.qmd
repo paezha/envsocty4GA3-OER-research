@@ -15,28 +15,132 @@ knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
 ```{r}
-library(tm) #using Corpus()
-library(text2vec) #using itoken()
-library(wordcloud) #using wordcloud()
-library(tidytext) #using unnest_tokens(),..
-library(igraph) # using graph_from_data_frame()...
+library(dplyr) # A Grammar of Data Manipulation
 library(ggraph) #using ggraph()
-library(quanteda) #using kwic()
+library(ggwordcloud) # A Word Cloud Geom for 'ggplot2'
+library(here) # A Simpler Way to Find Your Files
+library(igraph) # using graph_from_data_frame()...
 library(kableExtra) #using column_spec()
 library(ldatuning) #using FindTopicsNumber
-library(topicmodels) #using LDA
-library(here) # A Simpler Way to Find Your Files
-library(dplyr) # A Grammar of Data Manipulation
+library(SnowballC) # Snowball Stemmers Based on the C 'libstemmer' UTF-8 Library
+library(stringr) # Simple, Consistent Wrappers for Common String Operations
+library(text2vec) #using itoken()
+library(tidygraph) # A Tidy API for Graph Manipulation
 library(tidyr) # Tidy Messy Data
+library(tidytext) #using unnest_tokens(),..
+library(tm) #using Corpus()
+library(topicmodels) #using LDA
+library(quanteda) #using kwic()
 ```
 
+## Load data
+
+The reflections were pre-processed in notebook `00-raw-data-to-string.Rmd` in folder `data-inputs`.
 ```{r}
 #load ananymous data:
 load("data/corpus_raw.rda")
 ```
 
-## Winter 2022 reflections
+## Tidy up text
 
+Remove common words that are not informative:
+```{r}
+corpus_raw <- corpus_raw |>
+  mutate(text = str_remove_all(text, "ENVSOCTY | 4GA3 | envsocty | ENVSOCTY4GA3 | ENVOCTY | envsocty | envsocty 4ga3 | 4ga3 | course| class | classes | paez | Dr. | Dr | dr | Antonio | Paez | Páez | Raj | Ubhi | Rajveer | Anastasia | Soukhov | TA | Instructor| r | studio | even | though | many | people | different | also | high| lot"))
+```
+
+
+```{r}
+reflections_words <- corpus_raw |>
+  unnest_tokens(word, text)
+```
+
+Remove stop words:
+```{r}
+data(stop_words)
+reflections_words <- reflections_words |>
+  anti_join(stop_words, by = "word")
+
+reflections_words
+```
+
+Use this code to explore possible stems:
+```{r}
+reflections_words |> 
+  mutate(stem = case_when(str_starts(word, "concept") ~ "concepts",
+                          str_starts(word, "experi") ~ "experience",
+                          str_starts(word, "find") | str_starts(word, "found$") ~ "finding",
+                          str_starts(word, "help") ~ "help",
+                          str_starts(word, "know") ~ "knowledge",
+                          str_starts(word, "landscape") ~ "landscape",
+                          str_starts(word, "learn") ~ "learn",
+                          str_starts(word, "map") ~ "map",
+                          str_starts(word, "random") ~ "random",
+                          str_starts(word, "skill") ~ "skill",
+                          str_starts(word, "teaching")| str_starts(word, "teach$") | str_starts(word, "taught") | str_starts(word, "teachers") ~ "teachings",
+                          str_starts(word, "underst") ~ "understand",
+                          .default = word)) |>
+  group_by(stem) |>
+  summarize(stem_count = n(),
+            .groups = "drop") |>
+  # summarize(stem_count = sum(count),
+  #           .groups = "drop")
+  filter(str_detect(stem, "reflect"))
+```
+
+Fix some errors in the text:
+```{r}
+reflections_words <- reflections_words |>
+  mutate(text = str_replace(word, "knowledgeinformation", "knowledge information"),
+         text = str_replace(word, "skillsconcepts", "skills concepts"),
+         text = str_replace(word, "softskills", "soft skills"),
+         text = str_replace(word, "selfteaching", "self-teaching"),
+         text = str_replace(word, "studentteacher", "student teacher"),
+         text = str_replace(word, "teacherstudent", "teacher student"),
+         text = str_replace(word, "havereflected", "have reflected"),
+         text = str_replace(word, "wasreflected", "was reflected"))
+```
+
+Replace stemmed words:
+```{r, include=FALSE}
+reflections_words_stemmed <- reflections_words |> 
+  mutate(stem = case_when(str_starts(word, "accomplish") ~ "accomplishment",
+                          str_starts(word, "concept") ~ "concepts",
+                          str_starts(word, "experi") ~ "experience",
+                          str_starts(word, "find") | str_starts(word, "found$") ~ "finding",
+                          str_starts(word, "help") ~ "help",
+                          str_starts(word, "know") ~ "knowledge",
+                          str_starts(word, "landscape") ~ "landscape",
+                          str_starts(word, "learn") ~ "learn",
+                          str_starts(word, "map") ~ "map",
+                          str_starts(word, "random") ~ "random",
+                          str_starts(word, "skill") ~ "skill",
+                          str_starts(word, "teaching")| str_starts(word, "teach$") | str_starts(word, "taught") | str_starts(word, "teachers") ~ "teachings",
+                          str_starts(word, "underst") ~ "understand",
+                          .default = word)) |>
+  group_by(stem) |>
+  summarize(stem_count = n(),
+            .groups = "drop")
+```
+
+Examine the word frequency:
+```{r}
+reflections_words_stemmed |>
+  slice_max(order_by = stem_count, n = 100)
+```
+
+Wordcloud:
+```{r}
+ggplot(reflections_words_stemmed |>
+         filter(stem_count > 100), 
+       aes(label = stem,
+           size = stem_count)) +
+  geom_text_wordcloud() +
+  theme_minimal()
+```
+
+<!--
+Obtain the text from the corpus:
 ```{r}
 #Create text file of reflections
 text <- corpus_raw$text
@@ -45,33 +149,62 @@ text <- corpus_raw$text
 reflections <- Corpus(VectorSource(text))
 
 # Clean text
-reflections <- reflections %>% 
+reflections <- reflections |> 
   # Convert the text to lower case
-  tm_map(content_transformer(tolower)) %>%
+  tm_map(content_transformer(tolower)) |>
   # Remove numbers
-  tm_map(removeNumbers) %>%
+  tm_map(removeNumbers) |>
   # Remove english common stopwords
-  tm_map(removeWords, stopwords("english")) %>%
+  tm_map(removeWords, stopwords("english")) |>
   # Remove your own stop word
   # specify your stopwords as a character vector
-  tm_map(removeWords, c("ENVSOCTY 4GA3", "envsocty 4GA3", "ENVSOCTY4GA3", "envsocty", "envsocty 4ga3", "4ga3", "4GA3", "course", "class", "classes", "paez", "Dr.", "Antonio", "Paez", "Anastasia", "Soukhov", "TA", "Instructor", "r", "studio", "even", "though", "many", "people", "different", "reflection", "also",
-                        "flipped", "classroom", "high")) %>%
+  tm_map(removeWords, c("ENVSOCTY", "4GA3", "envsocty 4GA3", "ENVSOCTY4GA3", "ENVOCTY", "envsocty", "envsocty 4ga3", "4ga3", "4GA3", "course", "class", "classes", "paez", "Dr.", "Dr", "dr", "Antonio", "Paez", "Páez", "Raj", "Ubhi", "Rajveer", "Anastasia", "Soukhov", "TA", "Instructor", "r", "studio", "even", "though", "many", "people", "different", "reflection", "also", "high", "lot")) |> #  "flipped", "classroom"
   # Remove punctuations
-  tm_map(removePunctuation) %>%
+  tm_map(removePunctuation) |>
   # Eliminate extra white spaces
-  tm_map(stripWhitespace) #%>%
+  tm_map(stripWhitespace) #|>
   # Text stemming
   #tm_map(stemDocument)
 ```
 
 ```{r}
 # Create new data frame with the cleaned corpus 
-reflections_corpus <- data.frame(text = sapply(reflections, as.character), stringsAsFactors = FALSE)
+reflections_corpus <- data.frame(text = sapply(reflections, as.character), 
+                                 stringsAsFactors = FALSE) |>
+  mutate(text = str_replace(text, "knowledgeinformation", "knowledge information"),
+         text = str_replace(text, "skillsconcepts", "skills concepts"),
+         text = str_replace(text, "softskills", "soft skills"),
+         text = str_replace(text, "selfteaching", "self-teaching"),
+         text = str_replace(text, "studentteacher", "student teacher"),
+         text = str_replace(text, "teacherstudent", "teacher student"))
 reflection_it_train = itoken(reflections_corpus$text, progressbar = FALSE)
 reflection_vocab = create_vocabulary(reflection_it_train)
 
 # Cut out terms that have a minimum count of 1 
 reflection_vocab <- prune_vocabulary(reflection_vocab, term_count_min = 1)
+```
+
+Tokenize by word:
+```{r, include=FALSE}
+reflections_tidy <- reflections_corpus |> 
+  unnest_tokens(word, text)
+```
+
+Remove stop words:
+```{r, include=FALSE}
+data(stop_words)
+reflections_tidy <- reflections_tidy |>
+  anti_join(stop_words, by = "word")
+```
+
+
+```{r, include=FALSE}
+reflections_tidy <-  reflections_tidy |>
+  left_join(reflections_tidy |>
+              count(word),
+            by = "word") |>
+  distinct(word, .keep_all = TRUE) |>
+  rename(count = n)
 ```
 
 ```{r}
@@ -82,60 +215,144 @@ d <- data.frame(word = names(v),freq=v)
 ```
 
 ### Word cloud
+
 ```{r word-cloud, fig.height=8, fig.width=8, echo=FALSE, fig.cap="\\label{fig:word-cloud}A word cloud depicting common words identified in the learners' reflections."}
 #Creates the word cloud
 # png(file=paste0(here::here(),"/images/word_cloud_plot.png"))
-# wordcloud(words = d$word, freq = d$freq,
-#           max.words=200, random.order=FALSE,
-#           rot.per=0.35, 
-#           colors=brewer.pal(8, "Dark2"))
+wordcloud(words = d$word, freq = d$freq,
+          max.words=200, random.order=FALSE,
+          rot.per=0.35,
+          colors=brewer.pal(8, "Dark2"))
 # dev.off()
-knitr::include_graphics(paste0(here::here(),"/images/word_cloud_plot.png"))
+#knitr::include_graphics(paste0(here::here(),"/images/word_cloud_plot.png"))
 ```
+-->
+
 ## Relationships between words
 
-```{r reflections-bigrams}
-# n can be changed 
-reflections_bigrams <- reflections_corpus %>%
-  unnest_tokens(bigram, text, token = "ngrams", n = 2)
-reflections_trigrams <- reflections_corpus %>%
-  unnest_tokens(trigram, text, token = "ngrams", n = 3)
+### Bigrams
 
-# Bigrams and trigrams that are most common 
-top_reflections_bigrams <- reflections_bigrams %>%
+n-grams are are used to understand the relationships between words, that is, which words appear next to which others. In this section we look at bigrams:
+```{r}
+reflections_bigrams <- corpus_raw |>
+  unnest_tokens(bigram, 
+                text, 
+                token = "ngrams", 
+                n = 2)
+```
+
+Check the most frequent bigrams:
+```{r}
+reflections_bigrams |>
   count(bigram, sort = TRUE)
-top_reflections_trigrams <- reflections_trigrams %>% 
-  count(trigram, sort = TRUE)
+```
+
+Many bigrams are composed of common stop words. The bigrams can be separated to remove stop words:
+```{r}
+my_stop_words <- c("covid", "19")
+
+bigrams_separated <- reflections_bigrams |>
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+# Remove stop words
+bigrams_filtered <- bigrams_separated |>
+  filter(!word1 %in% stop_words$word) |>
+  filter(!word2 %in% stop_words$word) |>
+  filter(!word1 %in% my_stop_words) |>
+  filter(!word2 %in% my_stop_words)
+
+# new bigram counts:
+bigram_counts <- bigrams_filtered |>
+  count(word1, word2, sort = TRUE)
+
+bigram_counts
+```
+
+Now the bigrams consist of substantive words. Replace stems:
+```{r}
+bigrams_stemmed <- bigrams_filtered |> 
+  mutate(word1 = case_when(str_starts(word1, "accomplish") ~ "accomplishment",
+                          str_starts(word1, "concept") ~ "concepts",
+                          str_starts(word1, "experi") ~ "experience",
+                          str_starts(word1, "find") | str_starts(word1, "found$") ~ "finding",
+                          str_starts(word1, "help") ~ "help",
+                          str_starts(word1, "know") ~ "knowledge",
+                          str_starts(word1, "landscape") ~ "landscape",
+                          str_starts(word1, "learn") ~ "learn",
+                          str_starts(word1, "map") ~ "map",
+                          str_starts(word1, "random") ~ "random",
+                          str_starts(word1, "skill") ~ "skill",
+                          str_starts(word1, "teaching")| str_starts(word1, "teach$") | str_starts(word1, "taught") | str_starts(word1, "teachers") ~ "teachings",
+                          str_starts(word1, "underst") ~ "understand",
+                          .default = word1),
+         word2 = case_when(str_starts(word2, "accomplish") ~ "accomplishment",
+                          str_starts(word2, "concept") ~ "concepts",
+                          str_starts(word2, "experi") ~ "experience",
+                          str_starts(word2, "find") | str_starts(word2, "found$") ~ "finding",
+                          str_starts(word2, "help") ~ "help",
+                          str_starts(word2, "know") ~ "knowledge",
+                          str_starts(word2, "landscape") ~ "landscape",
+                          str_starts(word2, "learn") ~ "learn",
+                          str_starts(word2, "map") ~ "map",
+                          str_starts(word2, "random") ~ "random",
+                          str_starts(word2, "skill") ~ "skill",
+                          str_starts(word2, "teaching")| str_starts(word2, "teach$") | str_starts(word2, "taught") | str_starts(word2, "teachers") ~ "teachings",
+                          str_starts(word2, "underst") ~ "understand",
+                          .default = word2))
+```
+
+Check the bigrams after stemming words:
+```{r}
+bigrams_stemmed |>
+  count(word1, word2) |>arrange(desc(n))
 ```
 
 ```{r, include=FALSE}
-reflections_bigrams_separated <- reflections_bigrams %>%
-  separate(bigram, c("word1", "word2"), sep = " ")
-reflections_bigram_counts <- reflections_bigrams_separated %>% 
-  count(word1, word2, sort = TRUE)
+reflections_bigram_counts <- bigrams_stemmed |>
+  count(word1, word2) |>arrange(desc(n))
 
 # Adjust the parameter below to filter out bigrams based on desired number of occurrence
 # Error will occur if n is outside the range of occurrences 
-reflections_bigram_graph <- reflections_bigram_counts %>%
-  filter(n > 7) %>%
-  graph_from_data_frame()
+reflections_bigram_graph <- reflections_bigram_counts |>
+  filter(n > 50) |>
+  graph_from_data_frame() |>
+  as_tbl_graph()
+
+reflections_bigram_graph <- reflections_bigram_graph |>
+  activate(nodes) |>
+  left_join(reflections_words_stemmed,
+            by = c("name" = "stem"))
+
 set.seed(2022)
 a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
 ```
 
+<!--
 ```{r, include=FALSE}
 ReflectionsTextDF <- data.frame(text = sapply(reflections_corpus, as.character), stringsAsFactors = FALSE)
 R_it_train = itoken(ReflectionsTextDF$text, progressbar = FALSE)
 reflections_vocab = create_vocabulary(R_it_train)
 reflections_vocab <- prune_vocabulary(reflections_vocab)
 ```
+-->
 
 ```{r, echo=FALSE, fig.align = 'center', out.width = "1\\linewidth", fig.cap = "\\label{fig:reflections-visual}Most common bigrams found in student reflections from ENVSOCTY 4GA3"}
-ggraph(reflections_bigram_graph, layout = "fr") +
-  geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
-                 arrow = a, end_cap = circle(.07, 'inches')) +
-  geom_node_point(color = "lightblue", size = 4) +
+set.seed(2022)
+ggraph(reflections_bigram_graph |>
+         activate(nodes) |>
+         arrange(desc(stem_count)), 
+       layout = "linear", 
+       circular = TRUE) +
+  geom_edge_arc(aes(edge_alpha = n, 
+                    linewidth = n),
+                arrow = a,
+                end_cap = circle(.05, 'inches')) +
+  geom_node_point(aes(size = stem_count),
+                  color = "black") +
+  geom_node_point(aes(size = stem_count * 0.8),
+                  color = "lightgray") +
   geom_node_text(aes(label = name), repel = TRUE) + 
+  scale_edge_width(range = c(0.1, 3)) +
   theme_void()
 ```
 
@@ -168,7 +385,7 @@ kwic_pol_20 <- kwic(tokens(reflections_quanteda), pattern = "improve", window = 
 kwic_pol_21 <- kwic(tokens(reflections_quanteda), pattern = "positive", window = 20)
 kwic_pol_22 <- kwic(tokens(reflections_quanteda), pattern = "happy", window = 20)
 kwic_pol_23 <- kwic(tokens(reflections_quanteda), pattern = "proper", window = 20)
-#stopped below 'count' of 7 ('reflection_sentiments %>% filter(sentiment == "positive") %>% arrange(-count))
+#stopped below 'count' of 7 ('reflection_sentiments |> filter(sentiment == "positive") |> arrange(-count))
 ```
 
 ```{r, echo=FALSE}
@@ -184,10 +401,10 @@ text_tbl <- data.frame(
 )
 kbl(text_tbl,
     booktabs = TRUE,
-    caption = "The context of key terms that were identified as common bigrams.") %>%
-  kable_paper(full_width = F) %>%
-  kable_styling(latex_options = c("striped")) %>%
-  column_spec(1, bold = T) %>%
+    caption = "The context of key terms that were identified as common bigrams.") |>
+  kable_paper(full_width = F) |>
+  kable_styling(latex_options = c("striped")) |>
+  column_spec(1, bold = T) |>
   column_spec(2, width = "20em")
 ```
 
@@ -202,47 +419,27 @@ There were 41 negative and 57 positive sentiments found in learners' reflections
 The most common negative sentiments are *congestion* and *issues* which likely refer to the concept of traffic congestion or broader transportation issues that learners were introduced to in the course and that featured in many lessons.
 The most common positive sentiment was *helped* followed by *efficient*.
 
-```{r, include=FALSE}
-reflections_tidy <- reflections_corpus %>% 
-  unnest_tokens(word, text)
-```
 
-```{r, include=FALSE}
-data(stop_words)
-reflections_tidy <- reflections_tidy %>%
-  anti_join(stop_words, by = "word")
-```
-
-```{r, include=FALSE}
-reflections_tidy <-  reflections_tidy %>%
-  left_join(reflections_tidy %>%
-              count(word),
-            by = "word") %>%
-  distinct(word, .keep_all = TRUE) %>%
-  rename(count = n)
-```
-
-```{r, include=FALSE}
-reflections_tidy %>% arrange(desc(count))
-```
-
-```{r, include=FALSE}
-reflections_sentiments <- reflections_tidy %>%
-  inner_join(get_sentiments("bing"), by = c("word" = "word"))
+```{r}
+reflections_sentiments <- reflections_words_stemmed |>
+  inner_join(get_sentiments("bing"), by = c("stem" = "word"))
 reflections_sentiments
 ```
 
 ```{r sentiment-graph, echo=FALSE}
-reflections_sentiments %>%
-  count(sentiment, word, wt = count) %>%
-  ungroup() %>%
-  filter(n >= 5) %>%
-  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
-  mutate(term = reorder(word, n)) %>%
-  ggplot(aes(word, n, fill = sentiment)) +
+reflections_sentiments |>
+  count(sentiment, stem, wt = stem_count) |>
+  ungroup() |>
+  filter(!stem %in% c("significant", "regression", "plot", "crime")) |>
+  slice_max(order_by= n, 
+            n = 30) |>
+  mutate(n = ifelse(sentiment == "negative", -n, n)) |>
+  mutate(term = reorder(stem, n)) |>
+  ggplot(aes(stem, n, fill = sentiment)) +
   geom_bar(stat = "identity") +
   ylab("Contribution to sentiment") +
-  coord_flip()
+  coord_flip() +
+  theme_minimal()
 ```
 
 Again, we examined the context in which these sentiments can be found to better understand *what* was positive or negative about their experience in the course or using computational notebooks.
@@ -250,7 +447,7 @@ In Table \ref{tab:sentiment-context}, we provide some text examples of the diffe
 These examples demonstrate that learners drew upon their own experiences and perspectives, which were shaped by the course lectures, to reflect on what they learned by using the computational notebooks.
 
 ```{r, include=FALSE}
-# stopped below 'count' of 8 (reflections_sentiments %>% filter(sentiment == "negative") %>% arrange(-count)
+# stopped below 'count' of 8 (reflections_sentiments |> filter(sentiment == "negative") |> arrange(-count)
 kwic_pol_neg1 <- kwic(tokens(reflections_quanteda), pattern = "regression", window = 40)
 kwic_pol_neg2 <- kwic(tokens(reflections_quanteda), pattern = "difficult", window = 40)
 kwic_pol_neg3 <- kwic(tokens(reflections_quanteda), pattern = "hard", window = 40)
@@ -279,20 +476,20 @@ text_tbl <- data.frame(
 )
 kbl(text_tbl,
     booktabs = TRUE,
-    caption = "The context of common sentiments that were identified in learners' reflections. (negative only)") %>%
-  kable_paper(full_width = F) %>%
-  kable_styling(latex_options = c("striped")) %>%
-  column_spec(1, bold = T) %>%
+    caption = "The context of common sentiments that were identified in learners' reflections. (negative only)") |>
+  kable_paper(full_width = F) |>
+  kable_styling(latex_options = c("striped")) |>
+  column_spec(1, bold = T) |>
   column_spec(2, width = "20em")
 ```
 ```{r eval=TRUE}
 # This table does not seem to work due to a lack of columns
 kbl(text_tbl,
     booktabs = TRUE,
-    caption = "The context of common sentiments that were identified in learners' reflections.") %>%
-  kable_paper(full_width = F) %>%
-  kable_styling(latex_options = c("striped")) %>%
-  column_spec(1, bold = T) %>%
+    caption = "The context of common sentiments that were identified in learners' reflections.") |>
+  kable_paper(full_width = F) |>
+  kable_styling(latex_options = c("striped")) |>
+  column_spec(1, bold = T) |>
   column_spec(3, width = "10em")
 ```
 
@@ -331,23 +528,23 @@ reflections_topics <- tidy(reflections_lda, matrix = "beta")
 ```
 
 ```{r reflections-terms-creating"}
-reflections_top_terms <- reflections_topics %>%
-  group_by(topic) %>%
-  slice_max(beta, n = 10) %>% 
-  ungroup() %>%
+reflections_top_terms <- reflections_topics |>
+  group_by(topic) |>
+  slice_max(beta, n = 10) |> 
+  ungroup() |>
   arrange(topic, -beta)
 ```
 
 
 ```{r reflections-terms, echo=FALSE, out.width="1\\linewidth", cache=TRUE, fig.cap="\\label{fig:academic-terms}Topics identified in the learners' reflections according to clusters of words."}
 # png(file=paste0(here::here(),"/images/topic_clusters_plot.png"))
-# reflections_top_terms %>%
+# reflections_top_terms |>
 #   mutate(term = reorder_within(term, beta, topic),
 #          topic = case_when(topic == 1 ~ 'Threshold concepts',
 #                            topic == 2 ~ 'Science communication',
 #                            topic == 3 ~ 'New tools',
 #                            topic == 4 ~ 'Webbook',
-#                            topic == 5 ~ 'Flipped classroom')) %>%
+#                            topic == 5 ~ 'Flipped classroom')) |>
 #   ggplot(aes(beta, term, fill = factor(topic))) +
 #   geom_col(show.legend = FALSE) +
 #   facet_wrap(~ topic, scales = "free") +
@@ -362,4 +559,8 @@ knitr::include_graphics(paste0(here::here(),"/images/topic_clusters_plot.png"))
 3) -- "new tools for the future"
 4) -- "webbook"
 5) -- "flipped classroom"
+
+
+
+
 
